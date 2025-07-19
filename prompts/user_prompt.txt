@@ -1,0 +1,36 @@
+Step 1: Carefully analyze the HTML and URL below.
+Step 2: Extract the following fields, using only information present in the HTML/URL.
+Step 3: Classify if this is a newly released AI software tool or product (not a news article, event, job, newsletter, or announcement): respond with 'ai_tool' or 'not_ai_tool' as 'ai_tool_annotation'. If unsure, err on the side of 'ai_tool'.
+
+Output format (always use this exact JSON structure, no markdown, no code block):
+{{
+  "Title": string,
+  "Website": string,
+  "Core Functionality": string,
+  "Target Audience": string,
+  "Key Features": [string],
+  "Pricing": string,
+  "Source URL": string,
+  "Tags": [string],
+  "Publish Date": string,  # ISO 8601 (YYYY-MM-DD) if available, else empty string
+  "ai_tool_annotation": "ai_tool" | "not_ai_tool"
+}}
+
+Field requirements:
+- Title: Product/tool name (not company, not generic).
+- Website: Official homepage (if present, else use the URL).
+- Core Functionality: 1-2 sentence, information-dense summary of what the tool does. No marketing fluff.
+- Target Audience: Who is this for? (if available)
+- Key Features: List of product-specific features or use cases. Avoid generic/irrelevant items (e.g., 'BPO Services', 'Consultation', 'Process Automation').
+- Pricing: If available, else empty string.
+- Source URL: The page you are extracting from.
+- Tags: List of topic keywords (optional, if detectable).
+- Publish Date: Date the tool or update was published, in ISO 8601 (YYYY-MM-DD) format if available in the HTML/URL. If not available, use an empty string.
+- ai_tool_annotation: 'ai_tool' or 'not_ai_tool'.
+
+Remember: Only output the JSON object, no markdown, no explanations, no code block.
+
+URL: {url}
+
+HTML:
+{html_trunc} 
