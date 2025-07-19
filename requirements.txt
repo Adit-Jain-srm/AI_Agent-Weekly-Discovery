@@ -1,0 +1,10 @@
+aiohttp>=3.8.0
+openai>=1.0.0
+requests>=2.28.0
+serpapi>=0.1.0
+python-dotenv>=0.21.0
+google-search-results
+brotli
+pytest>=7.0.0
+pytest-asyncio>=0.20.0
+tqdm>=4.64.0
