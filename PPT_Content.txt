@@ -1,0 +1,435 @@
+====================================================
+SLIDE 1 — TITLE
+====================================================
+
+Title:
+AI Tool Discovery Agent
+
+Subtitle:
+Autonomously discover, analyze, and deliver the latest AI tools from the open web — every week.
+
+Bottom:
+Adit Jain | INT73 | Optimus Information Inc.
+Internship Project — June–July 2025
+
+Tech tags:
+Python 3.9+ | Azure OpenAI GPT-4o | Async | Serper.dev | SerpAPI | MS Teams
+
+
+====================================================
+SLIDE 2 — THE PROBLEM
+====================================================
+
+Title:
+The Problem
+
+Card 1: Time-Consuming
+- Hundreds of sites to monitor daily
+- New AI tools launch faster than anyone can track manually
+
+Card 2: Noise & Duplicates
+- Search results flooded with news, aggregators, social media
+- Redundant listings across multiple sources
+
+Card 3: No Structured Data
+- Tool info scattered across marketing pages
+- No consistent format for comparison or cataloging
+
+Card 4: Delayed Awareness
+- Teams learn about tools too late
+- Competitors may already be using them
+
+Bottom line:
+How do you discover every new AI tool within 7 days of launch, filter out noise, extract structured data, and deliver it automatically?
+
+
+====================================================
+SLIDE 3 — THE SOLUTION
+====================================================
+
+Title:
+The Solution
+
+Subtitle:
+End-to-end autonomous pipeline — zero manual intervention
+
+Step 1: SEARCH
+- Dual-engine queries (Serper + SerpAPI)
+- 6 query categories
+- 7-day strict date filter
+
+Step 2: FILTER
+- 70+ blocked domains
+- URL normalization
+- Aggregator removal
+- Deduplication
+
+Step 3: SCRAPE
+- Async batch fetching
+- robots.txt respect
+- Retries + exponential backoff
+- Auto-skip blacklisted domains
+
+Step 4: ANALYZE
+- GPT-4o single-call per tool
+- Field extraction + classification
+- No hallucination — only data from HTML
+
+Step 5: DELIVER
+- Console summary with stats
+- Teams webhook per tool
+- Error report + blacklist update
+
+Bottom line:
+Only confirmed, newly launched AI tools — structured, classified, and delivered to Teams.
+
+
+====================================================
+SLIDE 4 — PROJECT STRUCTURE
+====================================================
+
+Title:
+Project Architecture
+
+Subtitle:
+Modular design — each module has a single responsibility
+
+main.py               — Entry point, orchestration, Teams delivery
+agents/config_agent.py — Load .env, validate API keys, setup logging
+agents/search_agent.py — Dual search engine queries + filtering
+agents/scraper_agent.py— Async HTML fetch + GPT-4o extraction
+agents/pipeline_agent.py— Pipeline orchestration, batching, retries
+prompts/               — system_prompt.txt + user_prompt.txt (LLM templates)
+models/tool_info.py    — ToolInfo dataclass (structured output)
+utils/prompt_loader.py — Load prompt files + robots.txt checker
+utils/error_handling.py— Custom exception hierarchy with context
+utils/blacklist.py     — Persistent domain blacklist (3-strike rule)
+output/console.py      — Console formatting and summary
+output/teams.py        — Teams webhook integration
+config/constants.py    — All tunable parameters in one place
+data/blacklist.json    — Auto-generated blacklisted domains
+
+
+====================================================
+SLIDE 5 — DATA FLOW
+====================================================
+
+Title:
+Data Flow Pipeline
+
+Step 1: Environment Setup
+- File: config_agent.py
+- Loads .env, validates 5 API keys, sets up logging
+
+Step 2: Search & URL Collection
+- File: search_agent.py
+- 6 query categories × 2 search engines = up to ~456 raw URLs
+- Queries run in parallel via asyncio.gather
+- Normalizes URLs, removes aggregators, deduplicates
+
+Step 3: Async HTML Fetching
+- File: scraper_agent.py + pipeline_agent.py
+- Batches of 4, shared aiohttp session
+- 3 retries, exponential backoff (2s → 4s → 8s)
+- robots.txt cached per domain, blacklisted domains skipped
+
+Step 4: LLM Extraction & Classification
+- File: scraper_agent.py
+- HTML truncated to 15,000 chars
+- Single GPT-4o call extracts all fields + classifies
+- Throttled by semaphore (concurrency = 2)
+
+Step 5: Post-Processing
+- File: pipeline_agent.py
+- Keep only "ai_tool" classified results
+- Deduplicate by (website, title)
+- Remove tools older than 7 days
+
+Step 6: Output
+- File: main.py + output/
+- Console summary + Teams webhook
+- Error report + blacklist saved
+
+
+====================================================
+SLIDE 6 — SEARCH STRATEGY
+====================================================
+
+Title:
+Search & Filtering Strategy
+
+Dual Search Engines (run in parallel):
+- Serper.dev — Google SERP API, async POST
+- SerpAPI — Google Search, thread pool executor
+- 38 results per query per engine
+- Redundancy: if one fails, the other covers
+
+6 Query Categories:
+1. AI tool launches and releases
+2. AI apps, platforms, startups, SaaS
+3. AI tool features, updates, integrations
+4. AI directories and marketplaces
+5. General new/just released/now available
+6. Site filter: .com .io .ai .app .dev .tech .org
+
+70+ Blocked Domains:
+- Social: YouTube, Reddit, LinkedIn, Twitter/X, TikTok
+- News: TechCrunch, The Verge, Wired, Forbes, Bloomberg
+- Aggregators: FutureTools, G2, Capterra, AlternativeTo
+- Code: GitHub, GitLab, Bitbucket
+- Other: Wikipedia, StackOverflow, Medium, Substack
+
+URL Processing:
+- Strip query params and fragments
+- Deduplicate via set
+- Every query has "after:YYYY-MM-DD" for 7-day recency
+
+
+====================================================
+SLIDE 7 — SCRAPING & RESILIENCE
+====================================================
+
+Title:
+Async Scraping & Resilience
+
+Async Batch Fetching:
+- Shared aiohttp session per batch
+- Batch size = 4 (configurable)
+- asyncio.gather for parallel fetching
+- tqdm progress bar
+
+Retry & Backoff:
+- 3 retries per URL
+- Exponential backoff: 2s → 4s → 8s
+- HTTP 503: auto-retry
+- HTTP 403/404: non-retryable, record to blacklist
+- 30-second timeout per request
+
+Ethical Scraping:
+- robots.txt checked and cached per domain
+- Realistic browser User-Agent
+- 12 HTTP headers mimicking real browser
+- Batch throttling for politeness
+
+Persistent Blacklist:
+- Tracks failures per domain
+- 3 failures → domain auto-blacklisted
+- Saved to data/blacklist.json after each run
+- Loaded on startup — bad domains skipped automatically
+
+Error Handling:
+- AgentError base → ScrapingError, ExtractionError, ConfigError
+- Every exception carries context (URL, step, status)
+- All errors aggregated and reported at end
+
+
+====================================================
+SLIDE 8 — LLM EXTRACTION
+====================================================
+
+Title:
+LLM Extraction & Classification
+
+Model: Azure OpenAI GPT-4o
+- Temperature: 0.4
+- Max tokens: 800
+- API: AsyncAzureOpenAI
+
+Prompt Design:
+- System: "Expert AI tool analyst — JSON only, no hallucination"
+- User: 3-step template with exact JSON schema
+- Prompts in prompts/ directory — editable without code changes
+
+Fields Extracted (per tool):
+- Title
+- Website
+- Core Functionality (1-2 sentences)
+- Target Audience
+- Key Features (list)
+- Pricing
+- Source URL
+- Tags
+- Publish Date (ISO 8601)
+- ai_tool_annotation: "ai_tool" or "not_ai_tool"
+
+Why Single Call?
+- 50% fewer API calls vs separate extract + classify
+- Lower latency
+- Classification benefits from extraction context
+
+Throttling:
+- Semaphore concurrency = 2
+- Rate limit retry: 3 attempts, 10s delay
+
+Robustness:
+- HTML truncated to 15,000 chars
+- Regex fallback extracts JSON from LLM output
+- Strips markdown fences if present
+- Fallback ToolInfo on parse failure
+
+
+====================================================
+SLIDE 9 — PARALLELISM
+====================================================
+
+Title:
+Parallelism & Asynchronicity
+
+Step            | Async | Parallel        | Throttled         | Configurable
+Search          | Yes   | Yes (both APIs) | —                 | —
+HTML Fetch      | Yes   | Yes (per batch) | Yes (batch size)  | BATCH_SIZE = 4
+LLM Extraction  | Yes   | Yes (semaphore) | Yes (concurrency) | LLM_CONCURRENCY_LIMIT = 2
+Post-Processing | —     | —               | —                 | —
+Output          | —     | —               | —                 | —
+
+Key points:
+- Shared aiohttp session for connection pooling
+- asyncio.gather runs fetches concurrently within each batch
+- Semaphore prevents Azure OpenAI rate limits (429)
+- tqdm progress bars for fetching and extraction
+- All constants tunable in config/constants.py
+
+
+====================================================
+SLIDE 10 — TECH STACK
+====================================================
+
+Title:
+Technology Stack
+
+Language:        Python 3.9+
+LLM:             Azure OpenAI GPT-4o
+Search APIs:     Serper.dev + SerpAPI
+Async HTTP:      aiohttp
+LLM Client:      openai (AsyncAzureOpenAI)
+Progress Bars:   tqdm
+Config:          python-dotenv
+Output:          Console + Microsoft Teams (webhook)
+Testing:         pytest + pytest-asyncio
+Compression:     brotli
+
+10 dependencies in requirements.txt, all with minimum version pins.
+
+
+====================================================
+SLIDE 11 — TEAMS OUTPUT
+====================================================
+
+Title:
+Output & Teams Integration
+
+Console (output/console.py):
+- Formatted per-tool display
+- Summary: total URLs, successes, failures, skipped, blacklisted
+
+Teams (output/teams.py):
+- Rich markdown card per tool via webhook POST
+- Includes: Title, Website, Summary, Features, Pricing, Audience, Tags, Date
+- Only "ai_tool" classified results are sent
+- Webhook URL from TEAMS_WEBHOOK_URL env variable
+
+[Insert teams_output_example.png screenshot]
+
+
+====================================================
+SLIDE 12 — DESIGN DECISIONS
+====================================================
+
+Title:
+Key Design Decisions
+
+1. Dual Search Engines
+   Broader coverage + redundancy if one API fails
+
+2. Single LLM Call
+   Extract + classify in one call; 50% fewer API calls
+
+3. 70+ Domain Blocklist
+   Aggressive noise removal before scraping begins
+
+4. Async Everything
+   aiohttp + asyncio for massive I/O throughput
+
+5. Externalized Prompts
+   Edit prompts without code changes or redeployment
+
+6. Persistent Blacklist
+   3-strike rule; bad domains auto-skipped in future runs
+
+7. Centralized Config
+   One file (constants.py) to tune batch size, queries, headers
+
+8. Custom Exceptions
+   Error hierarchy with context dicts for debugging
+
+
+====================================================
+SLIDE 13 — DATA MODEL
+====================================================
+
+Title:
+ToolInfo Data Model
+
+Field              | Type           | Description
+title              | str            | Product/tool name
+website            | str            | Official homepage URL
+summary            | Optional[str]  | Core functionality (1-2 sentences)
+features           | List[str]      | Key features / use cases
+pricing            | Optional[str]  | Pricing info if available
+source             | str            | Source URL scraped from
+target_audience    | Optional[str]  | Who the tool is for
+main_text          | str            | Truncated HTML (debugging)
+ai_tool_annotation | Optional[str]  | "ai_tool" or "not_ai_tool"
+tags               | List[str]      | Topic keywords
+publish_date       | Optional[str]  | ISO 8601 (YYYY-MM-DD)
+
+
+====================================================
+SLIDE 14 — EXTENSIBILITY
+====================================================
+
+Title:
+Extensibility & Future Scope
+
+1. New Search Engines
+   Add Bing, DuckDuckGo in search_agent.py
+
+2. Better Prompts
+   Edit prompts/ text files directly, no code changes
+
+3. New Output Channels
+   Add Slack, email, dashboard in output/ directory
+
+4. CLI Arguments
+   Add argparse for category/date/format filtering
+
+5. Scheduling
+   Cron / Azure Functions / GitHub Actions for weekly runs
+
+6. Database & Dashboard
+   Persist to DB, build web UI for browsing tools
+
+
+====================================================
+SLIDE 15 — SUMMARY & THANK YOU
+====================================================
+
+Title:
+Summary
+
+- Fully autonomous — zero manual intervention
+- Dual-engine search with 6 query categories
+- 70+ aggregator domains blocked
+- Async pipeline with batching, retries, backoff
+- GPT-4o single-call extraction + classification
+- Self-healing persistent blacklist
+- Microsoft Teams delivery
+- Modular, extensible architecture
+
+
+Thank You
+
+Adit Jain | INT73
+Optimus Information Inc.
+Internship June–July 2025
+github.com/aditj-optimus/AI_Agent-Weekly-Discovery

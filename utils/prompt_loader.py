@@ -1,31 +1,35 @@
-import os
-from urllib.parse import urlparse
-import aiohttp
-from typing import Dict
 import logging
+import os
+from typing import Dict
+from urllib.parse import urlparse
+
+import aiohttp
 
 _robots_cache: Dict[str, str] = {}
+_PROMPTS_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "prompts")
+
 
 def load_prompt(filename: str) -> str:
-    """
-    Load a prompt template from the prompts directory.
+    """Load a prompt template from the prompts directory.
+
     Args:
-        filename (str): The name of the prompt file (e.g., 'system_prompt.txt').
+        filename: Name of the prompt file (e.g. 'system_prompt.txt').
+
     Returns:
-        str: The contents of the prompt file as a string.
+        Contents of the prompt file.
+
     Raises:
-        FileNotFoundError: If the file does not exist.
+        FileNotFoundError: If the prompt file does not exist.
     """
-    prompts_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'prompts')
-    path = os.path.join(prompts_dir, filename)
-    with open(path, 'r', encoding='utf-8') as f:
+    path = os.path.join(_PROMPTS_DIR, filename)
+    with open(path, "r", encoding="utf-8") as f:
         return f.read()
 
+
 async def is_allowed_by_robots(url: str, user_agent: str = "Mozilla/5.0") -> bool:
-    """
-    Check robots.txt to see if the given user-agent is allowed to fetch the URL.
-    Returns True if allowed, False if disallowed, True if robots.txt is missing, malformed, or on error (including invalid URLs).
-    Uses a simple in-memory cache per domain for efficiency.
+    """Check robots.txt to determine if fetching the URL is permitted.
+    Results are cached per domain for efficiency.
+    Returns True when in doubt (missing/malformed robots.txt or errors).
     """
     try:
         parsed = urlparse(url)
@@ -36,7 +40,7 @@ async def is_allowed_by_robots(url: str, user_agent: str = "Mozilla/5.0") -> boo
     except Exception as e:
         logging.warning(f"Exception parsing URL for robots.txt: {url} | {e}")
         return True
-    # Check cache first
+
     if robots_url in _robots_cache:
         content = _robots_cache[robots_url]
     else:
@@ -44,25 +48,27 @@ async def is_allowed_by_robots(url: str, user_agent: str = "Mozilla/5.0") -> boo
             async with aiohttp.ClientSession() as session:
                 async with session.get(robots_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                     if resp.status != 200:
-                        return True  # No robots.txt, assume allowed
+                        return True
                     content = await resp.text()
                     _robots_cache[robots_url] = content
         except Exception as e:
             logging.warning(f"Error fetching robots.txt for {robots_url}: {e}")
-            return True  # On error, assume allowed
+            return True
+
     try:
-        lines = content.splitlines()
         allowed = True
-        ua = None
-        for line in lines:
+        current_ua = None
+        for line in content.splitlines():
             line = line.strip()
             if line.lower().startswith("user-agent:"):
-                ua = line.split(":", 1)[1].strip()
-            elif line.lower().startswith("disallow:") and (ua == "*" or (ua is not None and user_agent in ua)):
+                current_ua = line.split(":", 1)[1].strip()
+            elif line.lower().startswith("disallow:") and (
+                current_ua == "*" or (current_ua is not None and user_agent in current_ua)
+            ):
                 path = line.split(":", 1)[1].strip()
                 if path and parsed.path.startswith(path):
                     allowed = False
         return allowed
     except Exception as e:
         logging.warning(f"Malformed robots.txt for {robots_url}: {e}")
-        return True  # On parse error, assume allowed 
+        return True
